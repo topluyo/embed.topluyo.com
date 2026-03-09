@@ -34,8 +34,8 @@ let ws = null;
 let isConnecting = false;
 let lastMessageTimestamp = 0;
 let reconnectAttempts = 0;
-let maxReconnectAttempts = 5;
-let reconnectDelay = 3000;
+let maxReconnectAttempts = 10;
+let reconnectDelay = 2000;
 
 // Initialize chat
 async function initChat() {
@@ -62,7 +62,7 @@ async function initChat() {
   const reconnectBtn = document.getElementById('reconnect-btn');
   reconnectBtn.addEventListener('click', () => {
     reconnectAttempts = 0;
-    reconnectDelay = 3000;
+    reconnectDelay = 2000;
     if (ws) {
       ws.close();
     }
@@ -156,7 +156,7 @@ function connectWebSocket() {
     console.log('WebSocket bağlantısı açıldı');
     isConnecting = false;
     reconnectAttempts = 0; // Reset on successful connection
-    reconnectDelay = 3000; // Reset delay
+    reconnectDelay = 2000; // Reset delay
     updateStatus('Bağlı', 'green');
     
     console.log('WebSocket mesajları gönderiliyor...');
@@ -225,23 +225,95 @@ function connectWebSocket() {
     console.log('WebSocket bağlantısı kapandı. Code:', event.code, 'Reason:', event.reason);
     isConnecting = false;
     updateStatus('Bağlantı Kesildi', 'red');
-    console.log('Otomatik yeniden bağlanma devre dışı. Manuel bağlanmak için "Yeniden Bağlan" butonuna tıklayın.');
+    
+    // Don't reconnect if closed normally (code 1000)
+    if (event.code === 1000) {
+      console.log('Normal kapanış, yeniden bağlanılmıyor');
+      return;
+    }
+    
+    // Auto reconnect with message check
+    scheduleReconnect();
   };
 }
 
 // Schedule reconnection with exponential backoff
-function scheduleReconnect() {
+async function scheduleReconnect() {
   if (reconnectAttempts >= maxReconnectAttempts) {
     console.log('Maksimum deneme sayısına ulaşıldı');
+    updateStatus('Maksimum bağlanma denemesi aşıldı', 'red');
     return;
   }
   
   console.log(`${reconnectDelay / 1000} saniye içinde yeniden bağlanılacak...`);
   
   setTimeout(async () => {
-    // Check for missed messages before reconnecting
-    console.log('Kaçırılan mesajlar kontrol ediliyor...');
-    await fetchMessages(lastMessageTimestamp);
+    try {
+      // Check for new messages from API before reconnecting
+      console.log('Yeniden bağlanmadan önce yeni mesajlar kontrol ediliyor...');
+      
+      const response = await fetch('https://topluyo.com/!api/post/list', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          after: 0,
+          before: 999999999,
+          channel_id: parseInt(channelId)
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const posts = data.data || data.posts || [];
+        
+        if (posts && posts.length > 0) {
+          // Get the newest message from API
+          const newestApiPost = posts.reduce((newest, post) => 
+            post.created_at > newest.created_at ? post : newest
+          , posts[0]);
+          
+          // Get the newest message from our local array
+          const newestLocalPost = messages.length > 0 ? 
+            messages.reduce((newest, post) => 
+              post.created_at > newest.created_at ? post : newest
+            , messages[0]) : null;
+          
+          console.log('API\'den en yeni mesaj ID:', newestApiPost.id, 'Local en yeni mesaj ID:', newestLocalPost?.id);
+          
+          // If the newest API message is different, add new messages
+          if (!newestLocalPost || newestApiPost.id !== newestLocalPost.id) {
+            console.log('Yeni mesajlar tespit edildi, listeye ekleniyor...');
+            let addedCount = 0;
+            
+            posts.forEach(post => {
+              if (!messages.find(m => m.id === post.id)) {
+                messages.unshift(post);
+                addedCount++;
+                
+                // Add to DOM with animation
+                addNewMessage(post);
+                
+                if (post.created_at > lastMessageTimestamp) {
+                  lastMessageTimestamp = post.created_at;
+                }
+              }
+            });
+            
+            // Sort messages: newest first
+            messages.sort((a, b) => b.created_at - a.created_at);
+            console.log(`${addedCount} yeni mesaj eklendi`);
+          } else {
+            console.log('Yeni mesaj yok, direkt WebSocket\'e bağlanılıyor');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Mesaj kontrolü hatası:', error);
+    }
+    
+    // Reconnect to WebSocket
     connectWebSocket();
   }, reconnectDelay);
   
