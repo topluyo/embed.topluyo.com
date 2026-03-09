@@ -1,10 +1,10 @@
-const serverId = new URLSearchParams(window.location.search).get('serverId');
-const channelId = new URLSearchParams(window.location.search).get('channelId');
+const group_id = new URLSearchParams(window.location.search).get('group_id');
+const channel_id = new URLSearchParams(window.location.search).get('channel_id');
 const root = document.getElementById('root');
 
-console.log('URL Parametreleri - serverId:', serverId, 'channelId:', channelId);
+console.log('URL Parametreleri - group_id:', group_id, 'channel_id:', channel_id);
 
-if (!(serverId && channelId)) {
+if (!(group_id && channel_id)) {
   root.innerHTML = `
     <div class="chat-container">
       <div class="chat-header">
@@ -16,13 +16,13 @@ if (!(serverId && channelId)) {
         <div class="error-message">
           <div style="font-size: 3em; margin-bottom: 0.3em;">😞</div>
           <div style="font-size: 1.2em; margin-bottom: 0.5em;">Gerekli parametreler eksik!</div>
-          <div style="font-size: 0.9em; opacity: 0.9;">URL'de serverId ve channelId parametrelerini belirtmelisiniz.</div>
-          <div style="margin-top: 1em; font-size: 0.85em; opacity: 0.8;">Örnek: ?serverId=3253&channelId=16250</div>
+          <div style="font-size: 0.9em; opacity: 0.9;">URL'de group_id ve channel_id parametrelerini belirtmelisiniz.</div>
+          <div style="margin-top: 1em; font-size: 0.85em; opacity: 0.8;">Örnek: ?group_id=3253&channel_id=16250</div>
         </div>
       </div>
     </div>
   `;
-  console.error('Missing serverId or channelId in URL parameters');
+  console.error('Missing group_id or channel_id in URL parameters');
 } else {
   console.log('Chat başlatılıyor...');
   initChat();
@@ -44,7 +44,7 @@ async function initChat() {
       <div class="chat-header">
         <div class="chat-header-info">
           <div class="chat-header-title">💬 Topluyo Chat</div>
-          <div class="chat-header-subtitle">Server ${serverId} • Channel ${channelId}</div>
+          <div class="chat-header-subtitle">Group ${group_id} • Channel ${channel_id}</div>
         </div>
         <div class="chat-status" id="status">
           <span class="status-dot" style="background: orange;"></span>
@@ -88,7 +88,7 @@ async function fetchMessages(after = 0, before = 999999999) {
       body: JSON.stringify({
         after: after,
         before: before,
-        channel_id: parseInt(channelId)
+        channel_id: parseInt(channel_id)
       })
     });
 
@@ -160,7 +160,7 @@ function connectWebSocket() {
     updateStatus('Bağlı', 'green');
     
     console.log('WebSocket mesajları gönderiliyor...');
-    console.log('serverId:', serverId, 'channelId:', channelId);
+    console.log('group_id:', group_id, 'channel_id:', channel_id);
     
     // Send 2 messages only
     setTimeout(() => {
@@ -171,7 +171,7 @@ function connectWebSocket() {
         
         setTimeout(() => {
           if (ws && ws.readyState === WebSocket.OPEN) {
-            const msg2 = `${serverId},${channelId}`;
+            const msg2 = `${group_id},${channel_id}`;
             console.log('Gönderiliyor [2/2]:', msg2, '(Uzunluk:', msg2.length, ')');
             ws.send(msg2);
             console.log('Tüm başlangıç mesajları gönderildi');
@@ -185,8 +185,8 @@ function connectWebSocket() {
     const message = event.data;
     console.log('WebSocket mesaj alındı:', message.substring(0, 150));
     
-    // Filter messages starting with >$post.{channelId}
-    const wsPrefix = `>$post.${channelId}.`;
+    // Filter messages starting with >$post.{channel_id}
+    const wsPrefix = `>$post.${channel_id}.`;
     if (message.startsWith(wsPrefix)) {
       try {
         // Find where JSON starts (after post ID)
@@ -260,7 +260,7 @@ async function scheduleReconnect() {
         body: JSON.stringify({
           after: 0,
           before: 999999999,
-          channel_id: parseInt(channelId)
+          channel_id: parseInt(channel_id)
         })
       });
 
