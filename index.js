@@ -377,7 +377,7 @@ function createMessageHTML(post) {
           <span class="message-author">${escapeHtml(post.nick || 'Anonim')}</span>
           <span class="message-time">${formatDate(post.created_at)}</span>
         </div>
-        <div class="message-text">${MARKTOP( MARKTOP.unescapeHtml(parseMarkdown(post.text || '')))}</div>
+        <div class="message-text">${MARKTOP( MARKTOP.unescapeHtml((post.text || '')))}</div>
       </div>
     </div>
   `;
